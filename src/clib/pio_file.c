@@ -5,6 +5,7 @@
 #include <config.h>
 #include <pio.h>
 #include <pio_internal.h>
+#include "../../tools/adios2pio-nm/adios2pio-nm-lib-c.h"
 
 /* This is the next ncid that will be used when a file is opened or
    created. We start at 16 so that it will be easy for us to notice
@@ -196,6 +197,10 @@ int PIOc_closefile(int ncid)
     file_desc_t *file;     /* Pointer to file information. */
     int ierr = PIO_NOERR;  /* Return code from function calls. */
     int mpierr = MPI_SUCCESS, mpierr2;  /* Return code from MPI function codes. */
+#ifdef _ADIOS
+    char outfilename[PIO_MAX_NAME + 1];
+    size_t len = 0;
+#endif
 
     LOG((1, "PIOc_closefile ncid = %d", ncid));
 
@@ -292,6 +297,13 @@ int PIOc_closefile(int ncid)
 				file->adios_attrs[i].att_name = NULL;
 			}
 			file->num_attrs = 0;
+
+            /* Convert XXXX.nc.bp to XXXX.nc */
+            len = strlen(file->filename);
+            assert(len > 6 && len <= PIO_MAX_NAME);
+            strncpy(outfilename, file->filename, len - 3);
+            outfilename[len - 3] = '\0';
+            C_API_ConvertBPToNC(file->filename, outfilename, "pnetcdf", ios->io_comm);
 
             free(file->filename);
             ierr = 0;
