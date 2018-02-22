@@ -44,10 +44,10 @@ static int nproc;
 #ifdef ADIOS_TIMING
 static double time_read, time_write;
 static double time_temp_read, time_temp_write;
-void TimerInitialize() { time_read = 0.0; time_write = 0.0; }
+void TimerInitialize_nm() { time_read = 0.0; time_write = 0.0; }
 #define TimerStart(x) { time_temp_##x = MPI_Wtime(); }
 #define TimerStop(x) { time_##x += (MPI_Wtime() - time_temp_##x); }
-void TimerReport(MPI_Comm comm)
+void TimerReport_nm(MPI_Comm comm)
 {
     int nproc, rank;
     double tr_sum, tr_max;
@@ -67,13 +67,13 @@ void TimerReport(MPI_Comm comm)
         cout << "PIO  write time   = " << std::fixed << std::setw(8) << tw_max << "s " << std::setw(8) << tw_sum << "s\n";
     }
 }
-void TimerFinalize() {}
+void TimerFinalize_nm() {}
 #else
-void TimerInitialize() {}
+void TimerInitialize_nm() {}
 #define TimerStart(x) {}
 #define TimerStop(x) {}
-void TimerReport(MPI_Comm comm) {}
-void TimerFinalize() {}
+void TimerReport_nm(MPI_Comm comm) {}
+void TimerFinalize_nm() {}
 #endif 
 
 void SetDebugOutput(int val) { debug_out = val; }
@@ -111,7 +111,7 @@ int InitPIO(MPI_Comm comm, int mpirank, int nproc)
 	return iosysid;
 }
 
-void FlushStdout(MPI_Comm comm)
+void FlushStdout_nm(MPI_Comm comm)
 {
     cout << std::flush;
     usleep((useconds_t)100);
@@ -121,7 +121,7 @@ void FlushStdout(MPI_Comm comm)
 /* Set the currently encountered max number of steps if argument is given.
  * Return the max step currently
  */
-int GlobalMaxSteps(int nsteps_in=0)
+int GlobalMaxSteps_nm(int nsteps_in=0)
 {
     static int nsteps_current = 1;
     if (nsteps_in > nsteps_current)
@@ -144,7 +144,7 @@ std::vector<int> AssignWriteRanks(int n_bp_writers, MPI_Comm comm, int mpirank, 
 	if (debug_out)
     	cout << "Process " << mpirank << " start block = " << start_wb <<
             	" number of blocks = " << nwb << std::endl;
-    FlushStdout(comm);
+    FlushStdout_nm(comm);
     std::vector<int> blocks(nwb);
     for (int i=0; i<nwb; ++i)
         blocks[i]=start_wb+i;
@@ -309,7 +309,7 @@ DecompositionMap ProcessDecompositions(ADIOS_FILE **infile, int ncid, std::vecto
             Decomposition d = ProcessOneDecomposition(infile, ncid, infile[0]->var_namelist[i], wfiles, iosysid, mpirank, nproc);
             decomp_map[decompname] = d;
         }
-        FlushStdout(comm);
+        FlushStdout_nm(comm);
     }
     return decomp_map;
 }
@@ -358,7 +358,7 @@ DimensionMap ProcessDimensions(ADIOS_FILE **infile, int ncid, MPI_Comm comm, int
             TimerStop(write);
             dimensions_map[dimname] = Dimension{dimid,(PIO_Offset)dimval};
         }
-        FlushStdout(comm);
+        FlushStdout_nm(comm);
     }
     return dimensions_map;
 }
@@ -417,12 +417,12 @@ VariableMap ProcessVariableDefinitions(ADIOS_FILE **infile, int ncid, DimensionM
             free(ndims);
             free(dimnames);
         }
-        FlushStdout(comm);
+        FlushStdout_nm(comm);
     }
     return vars_map;
 }
 
-int put_var(int ncid, int varid, int nctype, enum ADIOS_DATATYPES memtype, const void* buf)
+int put_var_nm(int ncid, int varid, int nctype, enum ADIOS_DATATYPES memtype, const void* buf)
 {
     int ret = 0;
     switch(memtype)
@@ -468,7 +468,7 @@ int put_var(int ncid, int varid, int nctype, enum ADIOS_DATATYPES memtype, const
     return ret;
 }
 
-int put_vara(int ncid, int varid, int nctype, enum ADIOS_DATATYPES memtype, PIO_Offset *start, PIO_Offset *count, const void* buf)
+int put_vara_nm(int ncid, int varid, int nctype, enum ADIOS_DATATYPES memtype, PIO_Offset *start, PIO_Offset *count, const void* buf)
 {
     int ret = 0;
     switch(memtype)
@@ -528,7 +528,7 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wfiles, int adio
     {
         /* Scalar variable */
         TimerStart(write);
-        int ret = put_var(ncid, var.nc_varid, var.nctype, vi->type, vi->value);
+        int ret = put_var_nm(ncid, var.nc_varid, var.nctype, vi->type, vi->value);
         if (ret != PIO_NOERR)
                 cout << "ERROR in PIOc_put_var(), code = " << ret
                      << " at " << __func__ << ":" << __LINE__ << endl;
@@ -537,7 +537,7 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wfiles, int adio
     else
     {
         /* An N-dimensional array that needs no rearrangement.
-         * put_vara() needs all processes participate */
+         * put_vara_nm() needs all processes participate */
         TimerStart(read);
 		
 		/* ACME writes this array from I/O processor 0 */
@@ -561,7 +561,7 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wfiles, int adio
 				start[d] = (PIO_Offset) vi->blockinfo[0].start[d];
    	    		count[d] = (PIO_Offset) vi->blockinfo[0].count[d];
 			}
- 			ret = put_vara(ncid, var.nc_varid, var.nctype, vi->type, start, count, buf);
+ 			ret = put_vara_nm(ncid, var.nc_varid, var.nctype, vi->type, start, count, buf);
    	    	if (ret != PIO_NOERR) {
    	    		cout << "rank " << mpirank << ":ERROR in PIOc_put_vara(), code = " << ret
    	    			 << " at " << __func__ << ":" << __LINE__ << endl;
@@ -575,7 +575,7 @@ int ConvertVariablePutVar(ADIOS_FILE **infile, std::vector<int> wfiles, int adio
 				start[d] = (PIO_Offset) 0;
    	    		count[d] = (PIO_Offset) 0;
 			}
-			ret = put_vara(ncid, var.nc_varid, var.nctype, vi->type, start, count, &temp_buf);
+			ret = put_vara_nm(ncid, var.nc_varid, var.nctype, vi->type, start, count, &temp_buf);
    	    	if (ret != PIO_NOERR) {
    	    		cout << "rank " << mpirank << ":ERROR in PIOc_put_vara(), code = " << ret
    	    			 << " at " << __func__ << ":" << __LINE__ << endl;
@@ -830,7 +830,7 @@ int ConvertVariableDarray(ADIOS_FILE **infile, int adios_varid, int ncid, Variab
          * But we have too many blocks in the adios file in such case and we need to deal with them
          */
         nsteps = g_nblocks / nblocks_per_step;
-        int maxSteps = GlobalMaxSteps();
+        int maxSteps = GlobalMaxSteps_nm();
         if (g_nblocks != nsteps * nblocks_per_step)
         {
             if (debug_out) cout << "rank " << mpirank << ":ERROR in processing darray '" << varname 
@@ -1102,7 +1102,7 @@ void ConvertBPFile(string infilepath, string outfilename, int pio_iotype, int io
 				}
 				free(ncop);
 			}
-			FlushStdout(comm);
+			FlushStdout_nm(comm);
 			PIOc_sync(ncid); /* FIXME: flush after each variable until development is done. Remove for efficiency */
 		}
 		TimerStart(write);
@@ -1128,7 +1128,7 @@ void ConvertBPFile(string infilepath, string outfilename, int pio_iotype, int io
     }
 }
 
-void usage(string prgname)
+void usage_nm(string prgname)
 {
         cout << "Usage: " << prgname << " bp_file  nc_file  pio_io_type\n";
         cout << "   bp file   :  data produced by PIO with ADIOS format\n";
@@ -1138,7 +1138,7 @@ void usage(string prgname)
         cout << "                   1       2        3         4\n";
 }
 
-enum PIO_IOTYPE GetIOType(string t)
+enum PIO_IOTYPE GetIOType_nm(string t)
 {
     enum PIO_IOTYPE iotype = PIO_IOTYPE_NETCDF;
     if (t == "pnetcdf" || t == "PNETCDF" || t == "1")
@@ -1200,15 +1200,15 @@ int ConvertBPToNC(string infilepath, string outfilename, string piotype, MPI_Com
 		nproc   = w_nproc;
 	}
 	
-    TimerInitialize();
+    TimerInitialize_nm();
 
     try {
 		if (io_proc) {
-        	enum PIO_IOTYPE pio_iotype = GetIOType(piotype);
+        	enum PIO_IOTYPE pio_iotype = GetIOType_nm(piotype);
         	iosysid = InitPIO(comm,mpirank,nproc);
         	ConvertBPFile(infilepath, outfilename, pio_iotype, iosysid,comm, mpirank, nproc);
         	PIOc_finalize(iosysid);
-        	TimerReport(comm);
+        	TimerReport_nm(comm);
 		}
 		MPI_Barrier(w_comm);
     } catch (std::invalid_argument &e) {
@@ -1219,7 +1219,7 @@ int ConvertBPToNC(string infilepath, string outfilename, string piotype, MPI_Com
         return 3;
     }
 
-    TimerFinalize();
+    TimerFinalize_nm();
     return ret;
 }
 
