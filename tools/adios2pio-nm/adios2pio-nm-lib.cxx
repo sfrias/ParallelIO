@@ -13,6 +13,7 @@
 #include "pio.h"
 #include "adios_read.h"
 #include "adios2pio-nm-lib.h"
+#include "adios2pio-nm-lib-c.h"
 
 using namespace std;
 
@@ -1222,3 +1223,15 @@ int ConvertBPToNC(string infilepath, string outfilename, string piotype, MPI_Com
     return ret;
 }
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int C_API_ConvertBPToNC(const char *infilepath, const char *outfilename, const char *piotype, MPI_Comm comm_in)
+{
+    return ConvertBPToNC(string(infilepath), string(outfilename), string(piotype), comm_in);
+}
+
+#ifdef __cplusplus
+}
+#endif
