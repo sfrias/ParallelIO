@@ -59,9 +59,9 @@ if (PIO_ENABLE_FORTRAN)
       SET(TIMING_LINK_LIB timing)
     endif()
 
-    SET(SRC examplePioADIOS.f90)
-    ADD_EXECUTABLE(examplePioADIOS_f90 ${SRC})
-    TARGET_LINK_LIBRARIES(examplePioADIOS_f90 piof pioc ${TIMING_LINK_LIB})
+    # SET(SRC examplePioADIOS.f90)
+    # ADD_EXECUTABLE(examplePioADIOS_f90 ${SRC})
+    # TARGET_LINK_LIBRARIES(examplePioADIOS_f90 piof pioc ${TIMING_LINK_LIB})
   endif(WITH_ADIOS)
 
 endif(PIO_ENABLE_FORTRAN)

@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include "pio.h"
+#include "pio_internal.h"
 #include "adios_read.h"
 #include "adios2pio-nm-lib.h"
 #include "adios2pio-nm-lib-c.h"
@@ -317,15 +318,19 @@ DecompositionMap ProcessDecompositions(ADIOS_FILE **infile, int ncid, std::vecto
 Decomposition GetNewDecomposition(DecompositionMap& decompmap, string decompname,
         ADIOS_FILE **infile, int ncid, std::vector<int>& wfiles, int nctype, int iosysid, int mpirank, int nproc)
 {
-    stringstream ss;
-    ss << decompname << "_" << nctype;
-    string key = ss.str();
+    // stringstream ss;
+    // ss << decompname << "_" << nctype;
+    // string key = ss.str();
+	char ss[256];
+	sprintf(ss,"%s_%d",decompname.c_str(),nctype);
+	string key(ss);
+
     auto it = decompmap.find(key);
     Decomposition d;
     if (it == decompmap.end())
     {
         string varname = "/__pio__/decomp/" + decompname;
-        d = ProcessOneDecomposition(infile, ncid, varname.c_str(), wfiles, nctype, iosysid, mpirank, nproc);
+        d = ProcessOneDecomposition(infile, ncid, varname.c_str(), wfiles, iosysid, mpirank, nproc, nctype);
         decompmap[key] = d;
     }
     else
@@ -971,6 +976,8 @@ void ConvertBPFile(string infilepath, string outfilename, int pio_iotype, int io
 
 	try {
 
+		int save_imax = pio_get_imax();
+
 		/*
 		 * This assumes we are running the program in the same folder where 
 		 * the BP folder exists.
@@ -1032,8 +1039,12 @@ void ConvertBPFile(string infilepath, string outfilename, int pio_iotype, int io
 		 * and attributes. Each node then opens the files assigned to that node. 
 		 */
 		for (int i=1;i<=wfiles.size();i++) {
-			ostringstream ss; ss << wfiles[i-1];
-			string fileid_str = ss.str(); 
+			// ostringstream ss; ss << wfiles[i-1];
+			// string fileid_str = ss.str(); 
+			char ss[64];
+			sprintf(ss,"%d",wfiles[i-1]);
+			string fileid_str(ss);
+
 			string filei = infilepath + ".dir/" + basefilename + "." + fileid_str;
 			infile[i] = adios_read_open_file(filei.c_str(), ADIOS_READ_METHOD_BP, MPI_COMM_SELF); 
 			if (debug_out) std::cout << "myrank " << mpirank << " file: " << filei << std::endl;
@@ -1106,6 +1117,18 @@ void ConvertBPFile(string infilepath, string outfilename, int pio_iotype, int io
 			PIOc_sync(ncid); /* FIXME: flush after each variable until development is done. Remove for efficiency */
 		}
 		TimerStart(write);
+
+ 		for (std::map<std::string,Decomposition>::iterator it=decomp_map.begin(); it!=decomp_map.end(); ++it) {
+	         Decomposition d = it->second;
+	         int err_code = PIOc_freedecomp(iosysid, d.ioid);
+	         if (err_code!=0) {
+	               printf("ERROR: PIOc_freedecomp: %d\n",err_code);
+	               fflush(stdout);
+	         }
+	    }
+
+		pio_set_imax(save_imax);
+
 		ret = PIOc_sync(ncid);
 		ret = PIOc_closefile(ncid);
 		TimerStop(write);
